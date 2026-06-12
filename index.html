@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Short-Text NLP Representation</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="hero">
+    <div class="container">
+      <h1>In Short-Text NLP, Representation Quality Is Won Before Modeling</h1>
+      <p class="subtitle">
+        Text normalization, slang preservation, and vocabulary design for noisy mental health classification
+      </p>
+      <div class="hero-buttons">
+        <a href="https://github.com/mah-trigui/short-text-nlp-representation" class="btn primary">View Repository</a>
+        <a href="#idea" class="btn secondary">Explore Method</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="section">
+      <div class="container">
+        <h2>Overview</h2>
+        <p>
+          This project classifies short free-text statements from Kenyan university students into four mental health categories: Depression, Alcohol, Suicide, and Drugs.
+        </p>
+        <p>
+          The central modeling issue was not only algorithm choice. The larger risk was that noisy short text would fragment the vocabulary before modeling even began.
+        </p>
+        <p>
+          Misspellings, slang, abbreviations, and inconsistent surface forms can split the same concept across multiple tokens, weakening TF-IDF and other sparse representations. The pipeline therefore treated normalization as part of representation design rather than routine text cleaning.
+        </p>
+      </div>
+    </section>
+
+    <section class="section alt">
+      <div class="container">
+        <h2>Architecture</h2>
+        <img src="images/architecture.jpg" alt="Short-text NLP normalization and representation design" class="architecture-image" />
+      </div>
+    </section>
+
+    <section class="section" id="idea">
+      <div class="container">
+        <h2>The Core Idea</h2>
+        <p>
+          In noisy short-text NLP, the model can lose before training starts if the vocabulary is fragmented by spelling variation.
+        </p>
+        <p>
+          For a sparse model, these can become unrelated terms:
+        </p>
+        <ul class="clean-list">
+          <li><code>depressed</code></li>
+          <li><code>depressd</code></li>
+          <li><code>deppressed</code></li>
+        </ul>
+        <p>
+          At the same time, some terms should <strong>not</strong> be normalized away. Local slang such as <code>bhang</code>, <code>miraa</code>, and <code>muguka</code> carries real semantic signal and should be preserved.
+        </p>
+        <div class="metric-box">
+          <p><strong>In applied NLP, preprocessing is part of representation design.</strong></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt">
+      <div class="container">
+        <h2>Pipeline Design</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>Unified text processing</h3>
+            <p>
+              Train and test text were combined before preprocessing so token handling and normalization logic stayed consistent across both sets.
+            </p>
+          </div>
+          <div class="card">
+            <h3>UDPipe tokenization</h3>
+            <p>
+              Text was tokenized before feature building, keeping only meaningful tokens and preparing the data for token-level correction.
+            </p>
+          </div>
+          <div class="card">
+            <h3>Hunspell correction</h3>
+            <p>
+              Misspelled terms were checked and corrected to reduce vocabulary fragmentation before TF-IDF construction.
+            </p>
+          </div>
+          <div class="card">
+            <h3>Slang preservation</h3>
+            <p>
+              Domain slang terms were explicitly whitelisted so generic spelling correction would not destroy local meaning.
+            </p>
+          </div>
+          <div class="card">
+            <h3>TF-IDF + LSA</h3>
+            <p>
+              Sparse lexical features were built using sublinear TF-IDF with L2 normalization, then complemented with 4 latent semantic dimensions.
+            </p>
+          </div>
+          <div class="card">
+            <h3>Multi-model ensemble</h3>
+            <p>
+              One-vs-rest GLMNet, XGBoost, Keras, and StarSpace-style representations were averaged to reduce variance on a small dataset.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <h2>Selected Code Snippets</h2>
+
+        <h3>1. Preserve domain slang during spelling correction</h3>
+        <pre>
+tokens$is_correct <- hunspell_check(tokens$token)
+
+slang_terms <- c("bhang", "miraa", "muguka", "shisha", "weed", "meth")
+tokens$is_correct[tokens$token %in% slang_terms] <- TRUE
+        </pre>
+
+        <h3>2. Apply token correction before reconstruction</h3>
+        <pre>
+tokens$corrected <- ifelse(
+    tokens$is_correct | is.na(tokens$suggestion),
+    tokens$token,
+    tokens$suggestion
+)
+        </pre>
+
+        <h3>3. Build TF-IDF with sublinear scaling and bigrams</h3>
+        <pre>
+vocab <- create_vocabulary(it_train, ngram = c(1L, 2L))
+vocab <- prune_vocabulary(vocab,
+    term_count_min = 2,
+    vocab_term_max = 5000
+)
+
+tfidf_model <- TfIdf$new(norm = "l2", sublinear_tf = TRUE)
+        </pre>
+
+        <h3>4. Simple probability averaging across model families</h3>
+        <pre>
+preds_list <- list(pred_glm[[cls]], pred_xgb[[cls]])
+if (!is.null(pred_keras)) preds_list <- c(preds_list, list(pred_keras[[cls]]))
+if (!is.null(pred_rui)) preds_list <- c(preds_list, list(pred_rui[[cls]]))
+
+avg_pred <- Reduce(`+`, preds_list) / length(preds_list)
+        </pre>
+      </div>
+    </section>
+
+    <section class="section alt">
+      <div class="container">
+        <h2>Why this matters</h2>
+        <ul class="clean-list">
+          <li>small noisy text datasets are highly sensitive to vocabulary fragmentation</li>
+          <li>normalization can improve signal density before any model is trained</li>
+          <li>generic text cleaning can erase local or domain-specific meaning if applied blindly</li>
+          <li>representation quality often matters as much as algorithm choice in applied NLP</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <h2>Where this pattern generalizes</h2>
+        <ul class="clean-list">
+          <li>support ticket classification</li>
+          <li>social media listening</li>
+          <li>student or customer survey text</li>
+          <li>low-resource or slang-heavy NLP tasks</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section alt">
+      <div class="container">
+        <h2>Key Takeaway</h2>
+        <div class="metric-box">
+          <p><strong>Before choosing the model, make sure the vocabulary reflects the concepts rather than the noise.</strong></p>
+          <p>
+            In noisy short-text NLP, normalization is not just cleaning. It is a representation decision.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <h2>Public Repository Scope</h2>
+        <p>
+          This public version focuses on the normalization logic, representation choices, selected modeling components, and project presentation. Competition data files are not included.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>Built as a public project showcase for applied NLP representation design and noisy text modeling.</p>
+    </div>
+  </footer>
+</body>
+</html>
